@@ -50,12 +50,14 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
     const id = user.uid;
     const email = user.email;
     const name = user.displayName || "No Name";
+    const username = email.substring(0, email.lastIndexOf("@"));
 
-    const mutation = `mutation($id: String!, $email: String, $name: String) {
+    const mutation = `mutation($id: String!, $email: String, $name: String, $username: String) {
     insert_users(objects: [{
         id: $id,
         email: $email,
         name: $name,
+        username: $username,
       }]) {
         affected_rows
       }
@@ -64,7 +66,8 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
         const data = await client.request(mutation, {
             id: id,
             email: email,
-            name: name
+            name: name,
+            username: username
         })
 
         return data;
