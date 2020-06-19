@@ -10,12 +10,13 @@ const client = new request.GraphQLClient('https://sparring-api.herokuapp.com/v1/
 })
 admin.initializeApp(functions.config().firebase);
 
-//sign uo with custom claims
+//sign up sparring app with custom claims
 exports.registerUser = functions.https.onCall(async (data, context) => {
 
     const email = data.email;
     const password = data.password;
     const displayName = data.displayName;
+    const photoURL = data.photoURL;
 
     if (email == null || password == null || displayName == null) {
         throw new functions.https.HttpsError('signup-failed', 'missing information');
@@ -25,21 +26,37 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
         var userRecord = await admin.auth().createUser({
             email: email,
             password: password,
-            displayName: displayName
+            displayName: displayName,
+            photoURL: photoURL,
         });
 
-        const customClaims = {
-            "https://hasura.io/jwt/claims": {
-                "x-hasura-default-role": "user",
-                "x-hasura-allowed-roles": ["user"],
-                "x-hasura-user-id": userRecord.uid
-            }
-        };
+        let customClaims;
+
+        if(photoURL == 'https://i.ibb.co/2dbTY5C/person.png') {
+            customClaims = {
+                "https://hasura.io/jwt/claims": {
+                    "x-hasura-default-role": "user",
+                    "x-hasura-allowed-roles": ["user"],
+                    "x-hasura-user-id": userRecord.uid
+                }
+            };
+            
+        } else {
+            customClaims = {
+                "https://hasura.io/jwt/claims": {
+                    "x-hasura-default-role": "owner",
+                    "x-hasura-allowed-roles": ["owner"],
+                    "x-hasura-user-id": userRecord.uid
+                }
+            };
+            
+        }
 
         await admin.auth().setCustomUserClaims(userRecord.uid, customClaims);
         return userRecord.toJSON();
 
     } catch (e) {
+        console.log(e);
         throw new functions.https.HttpsError('signup-failed', JSON.stringify(error, undefined, 2));
     }
 });
@@ -51,17 +68,33 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
     const email = user.email;
     const name = user.displayName || "No Name";
     const username = email.substring(0, email.lastIndexOf("@"));
+    const photoURL = user.photoURL;
 
-    const mutation = `mutation($id: String!, $email: String, $name: String, $username: String) {
-    insert_users(objects: [{
-        id: $id,
-        email: $email,
-        name: $name,
-        username: $username,
-      }]) {
-        affected_rows
-      }
-    }`;
+    let mutation;
+    if(photoURL == 'https://i.ibb.co/2dbTY5C/person.png') {
+        mutation = `mutation($id: String!, $email: String, $name: String, $username: String) {
+            insert_users(objects: [{
+                id: $id,
+                email: $email,
+                name: $name,
+                username: $username,
+            }]) {
+                affected_rows
+            }
+        }`;
+    } else {
+        mutation = `mutation($id: String!, $email: String, $name: String, $username: String) {
+            insert_owners(objects: [{
+                id: $id,
+                email: $email,
+                name: $name,
+                username: $username,
+            }]) {
+                affected_rows
+            }
+        }`;
+    }
+    
     try {
         const data = await client.request(mutation, {
             id: id,
@@ -75,6 +108,30 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
         throw new functions.https.HttpsError('sync-failed');
     }
 });
+
+exports.processGoogleSignIn = functions.auth.user().onCreate(user => {
+    const customClaims = {
+      "https://hasura.io/jwt/claims": {
+        "x-hasura-default-role": "user",
+        "x-hasura-allowed-roles": ["user"],
+        "x-hasura-user-id": user.uid
+      }
+    };
+  
+    return admin
+      .auth()
+      .setCustomUserClaims(user.uid, customClaims)
+      .then(() => {
+        // Update real-time database to notify client to force refresh.
+        const metadataRef = admin.database().ref("metadata/" + user.uid);
+        // Set the refresh time to the current UTC timestamp.
+        // This will be captured on the client to force a token refresh.
+        return metadataRef.set({ refreshTime: new Date().getTime() });
+      })
+      .catch(error => {
+        console.log(error);
+      });
+  });
 
 // SYNC WITH HASURA ON USER DELETE
 exports.processDelete = functions.auth.user().onDelete(async (user) => {
