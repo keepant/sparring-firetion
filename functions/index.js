@@ -89,6 +89,11 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
                 email: $email,
                 name: $name,
                 username: $username,
+                owner_doc: {
+                    data: {
+                        info: "ok"
+                    }
+                }
             }]) {
                 affected_rows
             }
