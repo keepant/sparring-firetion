@@ -41,6 +41,14 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
                 }
             };
             
+        } else if(photoURL == 'https://i.ibb.co/cYcKg83/ha.png') {
+            customClaims = {
+                "https://hasura.io/jwt/claims": {
+                    "x-hasura-default-role": "admin",
+                    "x-hasura-allowed-roles": ["admin", "user"],
+                    "x-hasura-user-id": userRecord.uid
+                }
+            }
         } else {
             customClaims = {
                 "https://hasura.io/jwt/claims": {
@@ -74,6 +82,17 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
     if(photoURL == 'https://i.ibb.co/2dbTY5C/person.png') {
         mutation = `mutation($id: String!, $email: String, $name: String, $username: String) {
             insert_users(objects: [{
+                id: $id,
+                email: $email,
+                name: $name,
+                username: $username,
+            }]) {
+                affected_rows
+            }
+        }`;
+    } else if(photoURL == 'https://i.ibb.co/cYcKg83/ha.png') {
+        mutation = `mutation($id: String!, $email: String, $name: String, $username: String) {
+            insert_admin(objects: [{
                 id: $id,
                 email: $email,
                 name: $name,
