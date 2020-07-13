@@ -53,7 +53,7 @@ exports.registerUser = functions.https.onCall(async (data, context) => {
             customClaims = {
                 "https://hasura.io/jwt/claims": {
                     "x-hasura-default-role": "owner",
-                    "x-hasura-allowed-roles": ["owner"],
+                    "x-hasura-allowed-roles": ["admin","user","owner"],
                     "x-hasura-user-id": userRecord.uid
                 }
             };
@@ -129,7 +129,7 @@ exports.processSignUp = functions.auth.user().onCreate(async user => {
 
         return data;
     } catch (e) {
-        throw new functions.https.HttpsError('sync-failed');
+        throw new functions.https.HttpsError(e+'sync-failed');
     }
 });
 
